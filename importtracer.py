@@ -1,4 +1,6 @@
-import builtins, sys
+import builtins
+import sys
+import time
 
 orig_import = builtins.__import__
 
@@ -15,23 +17,27 @@ class ImportTracker(object):
     def __init__(self, excludes=None):
         self.importstack = []
         self.record = []
+        self.timings = {}
         self.excludes = excludes or []
         self.in_exclude = False
 
     def _tracking_import(self, name, globals=None, locals=None, fromlist=(), level=0):
         imported_by = self.importstack[-1] if self.importstack else None  
 
-        self.importstack.append(len(self.record))
+        index = len(self.record)
+        self.importstack.append(index)
         self.record.append((name, imported_by, level))
         try:
+            tic = time.perf_counter()
             ret = orig_import(name, globals, locals, fromlist, level)
+            self.timings[index] = time.perf_counter() - tic
         finally:
             self.importstack.pop()
         return ret
     
-    def _process_names(self):
+    def _process(self):
         self.import_links = il = []
-        for name, imported_by, level in self.record:
+        for i, (name, imported_by, level) in enumerate(self.record):
             if imported_by is None:
                 imported_by = ''
             else:
@@ -48,7 +54,7 @@ class ImportTracker(object):
             else:
                 full_name = name
             
-            il.append((full_name, imported_by))
+            il.append((full_name, imported_by, self.timings.get(i, None)))
 
     @property
     def filtered_links(self):
@@ -58,7 +64,7 @@ class ImportTracker(object):
     def dump_nx_graph(self):
         import networkx
         g = networkx.DiGraph()
-        for name, imported_by in self.filtered_links:
+        for name, imported_by, timing in self.filtered_links:
             # add_edge adds both ends, so filter by imported_by as well
             if not any(imported_by.startswith(x) for x in self.excludes):
                 g.add_edge(imported_by, name)
@@ -71,7 +77,7 @@ class ImportTracker(object):
         
         import csv
         w = csv.writer(fileobj_or_path)
-        w.writerow(['Module', 'Imported by'])
+        w.writerow(['Module', 'Imported by', 'Time'])
         w.writerows(self.filtered_links)
 
 class track(object):
@@ -84,7 +90,7 @@ class track(object):
 
     def __exit__(self, etype, evalue, tb):
         builtins.__import__ = orig_import
-        self.it._process_names()
+        self.it._process()
 
 def main(argv=None):
     import argparse
