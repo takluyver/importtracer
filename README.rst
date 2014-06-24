@@ -10,7 +10,9 @@ graph of imports using `NetworkX <https://networkx.github.io/>`_. ``-x`` options
 will exclude packages from the reporting by prefix (the data is still collected,
 but not displayed.
 
-Python usage::
+Python usage:
+
+.. code:: python
 
     import importtracer
     
