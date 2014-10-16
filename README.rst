@@ -16,7 +16,7 @@ Python usage:
 
     import importtracer
     
-    with importtracer.trace(excludes=['numpy']) as it:
+    with importtracer.track(excludes=['numpy']) as it:
         import matplotlib
     
     # The imports made, as (modulename, importedby, time), filtering exclusions
